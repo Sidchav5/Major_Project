@@ -138,7 +138,7 @@ export default function Signup() {
         <div className="signup-card">
           {/* Brand Header */}
           <div className="signup-header">
-            <div className="signup-logo-wrapper">
+            <Link to="/" className="signup-logo-wrapper" style={{ textDecoration: 'none' }} title="Go to Home">
               <div className="signup-logo-icon">
                 <Shield className="signup-logo-shield" />
                 <div className="signup-logo-glow"></div>
@@ -147,7 +147,7 @@ export default function Signup() {
                 <span className="signup-brand-name">AI Ergonomics</span>
                 <span className="signup-brand-tagline">Monitor</span>
               </div>
-            </div>
+            </Link>
             
             <div className="signup-badge">
               <Sparkles className="signup-badge-icon" />

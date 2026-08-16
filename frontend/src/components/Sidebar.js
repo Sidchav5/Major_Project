@@ -1,6 +1,6 @@
 // src/components/Sidebar.js
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
@@ -110,7 +110,7 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
       >
         {/* Brand Header */}
         <div className="sidebar-header">
-          <div className="brand-wrapper">
+          <Link to="/" className="brand-wrapper" style={{ textDecoration: 'none' }} title="Go to Home">
             <div className="brand-icon-wrapper">
               <Shield className="brand-icon" />
               <div className="brand-icon-glow"></div>
@@ -124,7 +124,7 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
                 </span>
               </div>
             )}
-          </div>
+          </Link>
           
           {!isMobile && (
             <button 
