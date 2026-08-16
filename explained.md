@@ -1,6 +1,6 @@
 # AI Ergonomics Monitor — Complete Technical Reference Guide
 
-> **System**: Front-camera laptop ergonomic posture & digital wellness monitor using MediaPipe Face & Pose landmarks, Flask REST/MJPEG streaming, and a React 19 web dashboard.
+> **System**: Front-camera laptop ergonomic posture & digital wellness monitor using MediaPipe Face & Pose landmarks, WebRTC (`aiortc`) / Flask streaming, and a React 19 web dashboard.
 > **Camera**: Standard built-in laptop webcam (front-facing).
 > **User setup**: One seated person, upper body visible, directly facing the screen.
 
@@ -35,10 +35,24 @@ Temporal Persistence Engine
      ▼
 Annotator & State Sync
      │
-     ├──► MJPEG Stream Generator (/video_feed)
+     ├──► WebRTC PeerConnection Track (`aiortc` + `av` VideoStreamTrack) ──► <video> (Sub-100ms)
      ├──► Flask REST Status API (/api/status) [Sanitized JSON: no NaNs]
      └──► Frame Telemetry Logger (JSONL in logs/)
 ```
+
+---
+
+## ⚡ WebRTC Streaming Pipeline (`aiortc` + `av`)
+
+### Why WebRTC Replaced MJPEG:
+1. **Sub-100ms Latency**: Standard MJPEG over HTTP buffers JPEG files in browser memory, leading to a delay of 800ms–1500ms. WebRTC uses RTP over UDP to stream frames directly with under 100ms latency.
+2. **Hardware Decoding**: Streamed directly into a native `<video>` element, utilizing GPU-accelerated video decoding rather than CPU-bound image repainting.
+3. **Adaptive Real-Time Drop**: If an inference frame takes longer, WebRTC immediately synchronizes to the newest frame rather than queuing stale frames.
+
+### Handshake Flow:
+1. React client initializes `new RTCPeerConnection()`, adds a `recvonly` video transceiver, creates an SDP offer, and sends it to `POST /api/webrtc/offer`.
+2. Flask server invokes `aiortc.RTCPeerConnection`, mounts a custom `MonitorVideoTrack(VideoStreamTrack)` that grabs the latest annotated frame from the pipeline, generates an SDP answer, and returns it.
+3. The peer connection is established, and the `track` event binds the incoming `MediaStream` directly to `videoRef.current.srcObject`.
 
 ---
 
@@ -72,14 +86,14 @@ Annotator & State Sync
 - **Thresholds**:
   - Deviation $< 15^\circ$: `SAFE`
   - Deviation $\ge 15^\circ$: `WARNING` (`head_pitch_warning`)
-  - Deviation $\ge 20^\circ$: `NON-SAFE` (`head_pitch_non_safe`)
+  - Deviation $\ge 22^\circ$: `NON-SAFE` (`head_pitch_non_safe`)
 
 ### 3. Head Yaw (Turn Left / Right)
 - **Algorithm**: Horizontal facial rotation angle decomposed from FaceLandmarker transform matrix.
 - **Thresholds**:
   - Deviation $< 15^\circ$: `SAFE`
   - Deviation $\ge 15^\circ$: `WARNING` (`head_yaw_warning`)
-  - Deviation $\ge 30^\circ$: `NON-SAFE` (`head_yaw_non_safe`)
+  - Deviation $\ge 25^\circ$: `NON-SAFE` (`head_yaw_non_safe`)
 
 ### 4. Shoulder Tilt (Alignment)
 - **Algorithm**: Angle formed by left shoulder (#11) and right shoulder (#12) keypoints:
@@ -92,9 +106,9 @@ Annotator & State Sync
 ### 5. Slouch & Neck Compression Ratio
 - **Algorithm**: Vertical ratio of nose-to-shoulder-center distance relative to shoulder width.
 - **Thresholds**:
-  - Ratio $> 0.65$: `SAFE`
-  - Ratio $\le 0.65$: `WARNING` (`slouch_warning`)
-  - Ratio $\le 0.55$: `NON-SAFE` (`slouch_non_safe`)
+  - Ratio $> 0.40$: `SAFE`
+  - Ratio $\le 0.40$: `WARNING` (`slouch_warning`)
+  - Ratio $\le 0.30$: `NON-SAFE` (`slouch_non_safe`)
 
 ---
 
@@ -123,7 +137,7 @@ Annotator & State Sync
   - `backlight_glare`: Background luma is $\ge 40$ units brighter than face luma.
 
 ### 11. 20-20-20 Rule & Hydration Reminders
-- **20-20-20 Rule**: Every 20 minutes (configurable demo intervals), triggers a full-width overlay and audio chime for visual rest.
+- **20-20-20 Rule**: Every 20 minutes, triggers a full-width overlay and audio chime for visual rest.
 - **Hydration Reminder**: Timed reminder overlay with one-click **Accept** dismiss action.
 
 ---
@@ -132,7 +146,7 @@ Annotator & State Sync
 
 ### Frontend Pages
 1. **`LiveFeed` (`/live`)**:
-   - Live stream from `/video_feed`.
+   - WebRTC live video stream via `<video>` tag.
    - Compact **2-Column Live Metrics sidebar** displaying Distance, Pitch, Yaw, Shoulder Tilt, Blink Rate, Eye Openness, and Next Break Countdown without requiring vertical scrolling.
    - Interactive Toast and Video overlay notifications with auto-dismiss timers.
 2. **`Dashboard` (`/dashboard`)**:
