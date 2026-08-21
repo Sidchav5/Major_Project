@@ -1,6 +1,16 @@
 // src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
+import { 
+  Activity, 
+  LayoutDashboard, 
+  Video, 
+  FileText, 
+  UserPlus, 
+  LogIn, 
+  User, 
+  X 
+} from 'lucide-react';
 import './Navbar.css';
 
 function Navbar() {
@@ -21,17 +31,13 @@ function Navbar() {
     setIsMobileMenuOpen(false);
   }, [location]);
 
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
-
   return (
     <nav className={`navbar-enhanced ${isScrolled ? 'scrolled' : ''}`}>
       <div className="navbar-container">
         {/* Logo / Brand */}
         <Link to="/" className="navbar-brand">
           <div className="brand-icon">
-            <i className="fa-solid fa-camera"></i>
+            <Activity className="brand-icon-svg" />
             <div className="brand-icon-glow"></div>
           </div>
           <div className="brand-text">
@@ -46,21 +52,21 @@ function Navbar() {
             to="/dashboard" 
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <i className="fa-solid fa-chart-pie"></i>
+            <LayoutDashboard size={18} />
             <span>Dashboard</span>
           </NavLink>
           <NavLink 
             to="/live" 
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <i className="fa-solid fa-video"></i>
+            <Video size={18} />
             <span>Live Monitor</span>
           </NavLink>
           <NavLink 
             to="/reports" 
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <i className="fa-solid fa-file-chart-line"></i>
+            <FileText size={18} />
             <span>Reports</span>
           </NavLink>
         </div>
@@ -68,15 +74,15 @@ function Navbar() {
         {/* Auth Buttons */}
         <div className="navbar-actions">
           <Link to="/signup" className="btn-auth btn-signup">
-            <i className="fa-regular fa-user-plus"></i>
+            <UserPlus size={16} />
             <span>Sign Up</span>
           </Link>
           <Link to="/login" className="btn-auth btn-login">
-            <i className="fa-regular fa-user"></i>
+            <LogIn size={16} />
             <span>Login</span>
           </Link>
-          <Link to="/dashboard" className="btn-auth btn-profile">
-            <i className="fa-regular fa-circle-user"></i>
+          <Link to="/dashboard" className="btn-auth btn-profile" aria-label="Profile">
+            <User size={18} />
           </Link>
         </div>
 
@@ -98,40 +104,41 @@ function Navbar() {
       <div className={`mobile-menu ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="mobile-menu-content">
           <div className="mobile-menu-header">
-            <div className="mobile-brand">
-              <i className="fa-solid fa-camera"></i>
+            <Link to="/" className="mobile-brand" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }} title="Go to Home">
+              <Activity size={24} color="#60a5fa" />
               <span>AI Ergonomics</span>
-            </div>
+            </Link>
             <button 
               className="mobile-close-btn"
               onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Close menu"
             >
-              <i className="fa-solid fa-xmark"></i>
+              <X size={20} />
             </button>
           </div>
           
           <div className="mobile-nav-links">
             <Link to="/dashboard" className="mobile-nav-link">
-              <i className="fa-solid fa-chart-pie"></i>
+              <LayoutDashboard size={20} />
               <span>Dashboard</span>
             </Link>
             <Link to="/live" className="mobile-nav-link">
-              <i className="fa-solid fa-video"></i>
+              <Video size={20} />
               <span>Live Monitor</span>
             </Link>
             <Link to="/reports" className="mobile-nav-link">
-              <i className="fa-solid fa-file-chart-line"></i>
+              <FileText size={20} />
               <span>Reports</span>
             </Link>
           </div>
           
           <div className="mobile-auth-actions">
             <Link to="/signup" className="mobile-btn-primary">
-              <i className="fa-regular fa-user-plus"></i>
+              <UserPlus size={18} />
               Sign Up
             </Link>
             <Link to="/login" className="mobile-btn-secondary">
-              <i className="fa-regular fa-user"></i>
+              <LogIn size={18} />
               Login
             </Link>
           </div>

@@ -86,7 +86,7 @@ export default function Dashboard() {
       icon: Bell,
       color: 'blue',
       bg: 'rgba(37, 99, 235, 0.1)',
-      description: 'Implementation pending...'
+      description: 'Active & monitoring'
     },
     {
       name: 'System Settings',
@@ -96,7 +96,7 @@ export default function Dashboard() {
       icon: Settings,
       color: 'green',
       bg: 'rgba(16, 185, 129, 0.1)',
-      description: 'Implementation pending...'
+      description: 'Optimized profile'
     }
   ];
 

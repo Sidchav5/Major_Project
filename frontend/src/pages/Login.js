@@ -96,7 +96,7 @@ export default function Login() {
         <div className="login-card">
           {/* Brand Header */}
           <div className="login-header">
-            <div className="login-logo-wrapper">
+            <Link to="/" className="login-logo-wrapper" style={{ textDecoration: 'none' }} title="Go to Home">
               <div className="login-logo-icon">
                 <Shield className="login-logo-shield" />
                 <div className="login-logo-glow"></div>
@@ -105,7 +105,7 @@ export default function Login() {
                 <span className="login-brand-name">AI Ergonomics</span>
                 <span className="login-brand-tagline">Monitor</span>
               </div>
-            </div>
+            </Link>
             
             <div className="login-badge">
               <Sparkles className="login-badge-icon" />

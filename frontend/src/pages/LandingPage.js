@@ -19,7 +19,8 @@ import {
   Activity,
   Eye,
   Brain,
-  Sparkles
+  Sparkles,
+  Droplets
 } from 'lucide-react';
 import HeroSection from '../components/HeroSection';
 import Footer from '../components/Footer';
@@ -85,7 +86,9 @@ export default function LandingPage() {
     { icon: TrendingUp, title: 'Progress Tracking', description: 'Monitor your improvement over time' },
     { icon: Award, title: 'Smart Recommendations', description: 'Personalized tips for better health' },
     { icon: Clock, title: '20-20-20 Rule', description: 'Smart reminders for eye health breaks' },
-    { icon: Brain, title: 'AI-Powered', description: 'Advanced AI for accurate posture analysis' }
+    { icon: Brain, title: 'AI-Powered', description: 'Advanced AI for accurate posture analysis' },
+    { icon: Droplets, title: 'Smart Hydration Coach', description: 'Timed water intake reminders with interactive prompts to keep you hydrated and alert' },
+    { icon: Eye, title: 'Blink & Eye Fatigue Care', description: 'Real-time blink rate monitoring and squint detection to prevent digital eye strain' }
   ];
 
   const testimonials = [
