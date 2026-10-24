@@ -1,5 +1,5 @@
 // src/pages/Reports.js
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileText, 
   Download, 
@@ -20,85 +20,76 @@ import {
   MoreVertical,
   ChevronRight,
   Sparkles,
-  FileArchive
+  FileArchive,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
+import api from '../utils/api';
 import './Reports.css';
 
 export default function Reports() {
+  const [reports, setReports] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedReport, setSelectedReport] = useState(null);
   const [viewMode, setViewMode] = useState('list');
+  const [filterStatus, setFilterStatus] = useState('all');
 
-  const reports = [
-    { 
-      id: 1, 
-      name: 'Ergonomic_Report_Aug_14.pdf', 
-      date: 'August 14, 2026', 
-      size: '1.2 MB', 
-      score: 94,
-      status: 'excellent',
-      duration: '45 mins',
-      sessions: 3,
-      hasRecommendations: true
-    },
-    { 
-      id: 2, 
-      name: 'Ergonomic_Report_Aug_13.pdf', 
-      date: 'August 13, 2026', 
-      size: '1.4 MB', 
-      score: 88,
-      status: 'good',
-      duration: '120 mins',
-      sessions: 5,
-      hasRecommendations: true
-    },
-    { 
-      id: 3, 
-      name: 'Ergonomic_Report_Aug_10.pdf', 
-      date: 'August 10, 2026', 
-      size: '1.1 MB', 
-      score: 92,
-      status: 'excellent',
-      duration: '60 mins',
-      sessions: 2,
-      hasRecommendations: false
-    },
-    { 
-      id: 4, 
-      name: 'Ergonomic_Report_Aug_05.pdf', 
-      date: 'August 05, 2026', 
-      size: '1.5 MB', 
-      score: 75,
-      status: 'fair',
-      duration: '90 mins',
-      sessions: 4,
-      hasRecommendations: true
-    },
-    { 
-      id: 5, 
-      name: 'Ergonomic_Report_Jul_28.pdf', 
-      date: 'July 28, 2026', 
-      size: '1.3 MB', 
-      score: 82,
-      status: 'good',
-      duration: '55 mins',
-      sessions: 3,
-      hasRecommendations: false
-    },
-    { 
-      id: 6, 
-      name: 'Ergonomic_Report_Jul_20.pdf', 
-      date: 'July 20, 2026', 
-      size: '1.6 MB', 
-      score: 68,
-      status: 'poor',
-      duration: '75 mins',
-      sessions: 3,
-      hasRecommendations: true
-    },
-  ];
+  const fetchReports = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get('/api/sessions?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        const formatted = (data.sessions || []).map((s) => {
+          const started = s.started_at ? new Date(s.started_at) : new Date();
+          const dateStr = started.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          const mins = Math.max(1, Math.round((s.duration_sec || 0) / 60));
+          const statusRaw = (s.final_stats?.status || s.status || 'SAFE').toUpperCase();
+          
+          let score = 94;
+          let uiStatus = 'excellent';
+          if (statusRaw === 'WARNING') {
+            score = 75;
+            uiStatus = 'fair';
+          } else if (statusRaw === 'DANGER') {
+            score = 55;
+            uiStatus = 'poor';
+          }
+
+          return {
+            id: s.id,
+            name: `Ergonomic_Report_${s.id.slice(-6)}.pdf`,
+            date: dateStr,
+            rawDate: started,
+            size: s.has_pdf ? '1.4 MB' : 'Telemetry',
+            score: score,
+            status: uiStatus,
+            duration: `${mins} min${mins > 1 ? 's' : ''}`,
+            sessions: 1,
+            hasPdf: s.has_pdf,
+            hasRecommendations: true,
+            finalStats: s.final_stats || {},
+          };
+        });
+        setReports(formatted);
+      }
+    } catch (err) {
+      console.error('Failed to load reports from MongoDB:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
 
   const getStatusConfig = (status) => {
     const configs = {
@@ -142,13 +133,17 @@ export default function Reports() {
   };
 
   const getScoreBarWidth = (score) => {
-    // Map score to percentage width (minimum 10%, maximum 100%)
     return Math.max(10, score);
   };
 
   const filteredReports = useMemo(() => {
     let result = [...reports];
     
+    // Status filter
+    if (filterStatus !== 'all') {
+      result = result.filter(r => r.status === filterStatus);
+    }
+
     // Search filter
     if (searchTerm) {
       result = result.filter(report => 
@@ -162,16 +157,13 @@ export default function Reports() {
       let comparison = 0;
       switch (sortBy) {
         case 'date':
-          comparison = new Date(a.date) - new Date(b.date);
+          comparison = (a.rawDate || 0) - (b.rawDate || 0);
           break;
         case 'score':
           comparison = a.score - b.score;
           break;
         case 'name':
           comparison = a.name.localeCompare(b.name);
-          break;
-        case 'size':
-          comparison = parseFloat(a.size) - parseFloat(b.size);
           break;
         default:
           comparison = 0;
@@ -180,7 +172,7 @@ export default function Reports() {
     });
     
     return result;
-  }, [reports, searchTerm, sortBy, sortOrder]);
+  }, [reports, searchTerm, sortBy, sortOrder, filterStatus]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -192,24 +184,33 @@ export default function Reports() {
   };
 
   const handleDownload = (report) => {
-    // Simulate download
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = report.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (report.hasPdf) {
+      window.open(api.downloadUrl(`/api/sessions/${report.id}/pdf`), '_blank');
+    } else {
+      window.open(api.downloadUrl('/api/download_pdf'), '_blank');
+    }
   };
 
-  const handleDelete = (reportId) => {
-    if (window.confirm('Are you sure you want to delete this report?')) {
-      // Delete logic would go here
-      console.log('Deleting report:', reportId);
+  const handleDelete = async (reportId) => {
+    if (window.confirm('Are you sure you want to delete this session and its report?')) {
+      try {
+        const res = await api.delete(`/api/sessions/${reportId}`);
+        if (res.ok) {
+          setReports((prev) => prev.filter((r) => r.id !== reportId));
+        } else {
+          alert('Failed to delete report.');
+        }
+      } catch (err) {
+        console.error('Delete error:', err);
+      }
     }
   };
 
   const getStats = () => {
     const total = reports.length;
+    if (total === 0) {
+      return { total: 0, avgScore: 100, excellent: 0, needsWork: 0 };
+    }
     const avgScore = Math.round(reports.reduce((sum, r) => sum + r.score, 0) / total);
     const excellent = reports.filter(r => r.status === 'excellent').length;
     const needsWork = reports.filter(r => r.status === 'poor' || r.status === 'fair').length;
@@ -225,17 +226,17 @@ export default function Reports() {
         <div className="header-left">
           <div className="header-badge">
             <Sparkles className="badge-icon" />
-            <span>AI-Generated Reports</span>
+            <span>AI-Generated Reports & History</span>
           </div>
-          <h1 className="page-title">Reports Archive</h1>
+          <h1 className="page-title">Personalized Reports</h1>
           <p className="page-subtitle">
-            Access your historical AI-generated ergonomic insights and recommendations
+            Access your real session logs, AI-generated ergonomic insights, and downloadable PDF reports
           </p>
         </div>
         <div className="header-right">
-          <button className="header-action-btn primary">
-            <FileArchive className="action-icon" />
-            <span>Generate New</span>
+          <button className="header-action-btn primary" onClick={fetchReports} disabled={isLoading}>
+            <RefreshCw className={`action-icon ${isLoading ? 'spinning' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -248,7 +249,7 @@ export default function Reports() {
           </div>
           <div className="stat-content">
             <span className="stat-value">{stats.total}</span>
-            <span className="stat-label">Total Reports</span>
+            <span className="stat-label">Total Sessions</span>
           </div>
         </div>
         <div className="stat-card">
@@ -266,7 +267,7 @@ export default function Reports() {
           </div>
           <div className="stat-content">
             <span className="stat-value">{stats.excellent}</span>
-            <span className="stat-label">Excellent Reports</span>
+            <span className="stat-label">Optimal Sessions</span>
           </div>
         </div>
         <div className="stat-card">
@@ -288,7 +289,7 @@ export default function Reports() {
             <input
               type="text"
               className="search-input"
-              placeholder="Search reports..."
+              placeholder="Search sessions..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -319,23 +320,31 @@ export default function Reports() {
         <div className="toolbar-right">
           <div className="filter-group">
             <Filter className="filter-icon" />
-            <select className="filter-select">
-              <option value="all">All Reports</option>
-              <option value="excellent">Excellent</option>
-              <option value="good">Good</option>
-              <option value="fair">Fair</option>
+            <select 
+              className="filter-select"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="all">All Sessions</option>
+              <option value="excellent">Optimal (Safe)</option>
+              <option value="fair">Fair (Warning)</option>
               <option value="poor">Needs Improvement</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Reports List */}
-      {viewMode === 'list' ? (
+      {/* Loading state */}
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#60a5fa' }}>
+          <Loader2 className="spinning" size={36} style={{ margin: '0 auto 16px' }} />
+          <p>Loading your sessions from MongoDB Atlas...</p>
+        </div>
+      ) : viewMode === 'list' ? (
         <div className="reports-list">
           <div className="reports-table-header">
             <div className="header-cell name" onClick={() => handleSort('name')}>
-              <span>Report Name</span>
+              <span>Session / Report</span>
               <ArrowUpDown className="sort-icon" />
             </div>
             <div className="header-cell date" onClick={() => handleSort('date')}>
@@ -343,7 +352,7 @@ export default function Reports() {
               <ArrowUpDown className="sort-icon" />
             </div>
             <div className="header-cell score" onClick={() => handleSort('score')}>
-              <span>Score</span>
+              <span>Posture Score</span>
               <ArrowUpDown className="sort-icon" />
             </div>
             <div className="header-cell status">Status</div>
@@ -353,9 +362,9 @@ export default function Reports() {
           {filteredReports.length === 0 ? (
             <div className="empty-state">
               <FileText className="empty-icon" />
-              <h3 className="empty-title">No reports found</h3>
+              <h3 className="empty-title">No sessions recorded yet</h3>
               <p className="empty-description">
-                Try adjusting your search or filter criteria
+                Start a monitoring session from the Live Monitor page to automatically record telemetry and generate your first AI report.
               </p>
             </div>
           ) : (
@@ -379,10 +388,10 @@ export default function Reports() {
                       <div className="report-details">
                         <div className="report-name-wrapper">
                           <span className="report-name">{report.name}</span>
-                          {report.hasRecommendations && (
+                          {report.hasPdf && (
                             <span className="recommendation-badge">
                               <Sparkles className="recommendation-icon" />
-                              Recommendations
+                              PDF in GridFS
                             </span>
                           )}
                         </div>
@@ -395,11 +404,6 @@ export default function Reports() {
                           <span className="meta-item">
                             <Clock className="meta-icon" />
                             {report.duration}
-                          </span>
-                          <span className="meta-divider">•</span>
-                          <span className="meta-item">
-                            <User className="meta-icon" />
-                            {report.sessions} sessions
                           </span>
                           <span className="meta-divider">•</span>
                           <span className="meta-item">{report.size}</span>
@@ -437,25 +441,18 @@ export default function Reports() {
 
                     <div className="report-actions">
                       <button 
-                        className="action-btn view"
-                        onClick={() => setSelectedReport(report)}
-                      >
-                        <Eye className="action-icon" />
-                      </button>
-                      <button 
                         className="action-btn download"
+                        title="Download PDF"
                         onClick={() => handleDownload(report)}
                       >
                         <Download className="action-icon" />
                       </button>
                       <button 
                         className="action-btn delete"
+                        title="Delete Session"
                         onClick={() => handleDelete(report.id)}
                       >
                         <Trash2 className="action-icon" />
-                      </button>
-                      <button className="action-btn more">
-                        <MoreVertical className="action-icon" />
                       </button>
                     </div>
                   </div>
@@ -491,7 +488,7 @@ export default function Reports() {
                     <Calendar className="grid-meta-icon" />
                     {report.date}
                   </span>
-                  <span className="grid-meta-item">{report.size}</span>
+                  <span className="grid-meta-item">{report.duration}</span>
                 </div>
                 <div className="grid-card-score">
                   <div className="grid-score-wrapper">
@@ -508,13 +505,12 @@ export default function Reports() {
                   </span>
                 </div>
                 <div className="grid-card-actions">
-                  <button className="grid-action-btn">
-                    <Eye className="grid-action-icon" />
-                    View
-                  </button>
-                  <button className="grid-action-btn primary">
+                  <button className="grid-action-btn primary" onClick={() => handleDownload(report)}>
                     <Download className="grid-action-icon" />
                     Download
+                  </button>
+                  <button className="grid-action-btn" onClick={() => handleDelete(report.id)}>
+                    <Trash2 className="grid-action-icon" />
                   </button>
                 </div>
               </div>
@@ -526,8 +522,8 @@ export default function Reports() {
       {/* Footer Info */}
       <div className="reports-footer">
         <p>
-          New reports are generated automatically when you end a live session.
-          <span className="footer-highlight"> AI-powered insights</span> available for every session.
+          Sessions and AI reports are saved to your account in MongoDB Atlas.
+          <span className="footer-highlight"> GridFS storage</span> keeps your high-fidelity PDF documents accessible anytime.
         </p>
       </div>
     </div>

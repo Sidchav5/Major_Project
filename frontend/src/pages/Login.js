@@ -17,7 +17,7 @@ import {
 import './Login.css';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,11 +26,11 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Load saved username if remember me was checked
+  // Load saved email if remember me was checked
   useEffect(() => {
-    const savedUsername = localStorage.getItem('rememberedUsername');
-    if (savedUsername) {
-      setUsername(savedUsername);
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
       setRememberMe(true);
     }
   }, []);
@@ -40,19 +40,18 @@ export default function Login() {
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const result = await login(email, password);
       
-      if (login(username, password)) {
+      if (result.success) {
         if (rememberMe) {
-          localStorage.setItem('rememberedUsername', username);
+          localStorage.setItem('rememberedEmail', email);
         } else {
-          localStorage.removeItem('rememberedUsername');
+          localStorage.removeItem('rememberedEmail');
         }
         navigate('/dashboard');
       } else {
-        setError('Invalid username or password. Please try again.');
+        setError(result.error || 'Invalid email or password. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -128,20 +127,20 @@ export default function Login() {
 
           {/* Login Form */}
           <form className="login-form" onSubmit={handleSubmit}>
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="form-group">
               <label className="form-label">
                 <User className="form-label-icon" />
-                Username
+                Email Address
               </label>
               <div className="input-wrapper">
                 <User className="input-icon" />
                 <input
-                  type="text"
+                  type="email"
                   className="form-input"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
                 />

@@ -6,6 +6,7 @@ import {
   Play, 
   Loader2, 
   FileText, 
+  Download,
   CheckCircle, 
   AlertTriangle, 
   X, 
@@ -19,6 +20,7 @@ import {
   RefreshCw 
 } from 'lucide-react';
 import './LiveFeed.css';
+import api from '../utils/api';
 
 const API_BASE = '';
 
@@ -114,7 +116,15 @@ export default function LiveFeed() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/status`);
+        const res = await api.get('/api/status');
+        if (!res.ok) {
+          if (res.status === 401) {
+            setBackendOnline(true);
+            return;
+          }
+          setBackendOnline(false);
+          return;
+        }
         const data = await res.json();
         setBackendOnline(true);
 
@@ -172,7 +182,7 @@ export default function LiveFeed() {
 
   const handleStart = async () => {
     try {
-      await fetch(`${API_BASE}/api/start`, { method: 'POST' });
+      await api.post('/api/start');
       setStatus('running');
       setPdfPath(null);
       setSessionTime(0);
@@ -184,7 +194,7 @@ export default function LiveFeed() {
   const handleStop = async () => {
     try {
       setStatus('stopping');
-      await fetch(`${API_BASE}/api/stop`, { method: 'POST' });
+      await api.post('/api/stop');
     } catch (err) {
       console.error('Failed to stop:', err);
     }
@@ -192,11 +202,7 @@ export default function LiveFeed() {
 
   const handleDismissAlert = async (alertType) => {
     try {
-      await fetch(`${API_BASE}/api/dismiss_alert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alert_type: alertType })
-      });
+      await api.post('/api/dismiss_alert', { alert_type: alertType });
       setNotifications((prev) => prev.filter((n) => n.type !== alertType));
       seenAlertsRef.current.delete(alertType);
     } catch (err) {
@@ -540,10 +546,19 @@ export default function LiveFeed() {
               <FileText className="pdf-icon" />
             </div>
             <div className="pdf-banner-info">
-              <h4 className="pdf-banner-title">PDF Report Generated Successfully!</h4>
-              <p className="pdf-banner-subtitle">Your AI ergonomic report is ready.</p>
+              <h4 className="pdf-banner-title">PDF Ergonomic Report Ready!</h4>
+              <p className="pdf-banner-subtitle">Your AI-generated session report and health insights are ready.</p>
             </div>
-            <span className="pdf-banner-path">{pdfPath}</span>
+            <a 
+              href={api.downloadUrl('/api/download_pdf')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pdf-download-btn"
+              download="Ergonomic_Report.pdf"
+            >
+              <Download className="download-btn-icon" />
+              Download PDF Report
+            </a>
           </div>
         </div>
       )}
