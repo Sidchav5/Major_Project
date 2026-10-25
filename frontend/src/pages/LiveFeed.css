@@ -882,6 +882,34 @@
   border-radius: 6px;
 }
 
+.pdf-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: #10b981;
+  color: #ffffff !important;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pdf-download-btn:hover {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.download-btn-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* ── Responsive Design ── */
 @media (max-width: 1200px) {
   .live-content {

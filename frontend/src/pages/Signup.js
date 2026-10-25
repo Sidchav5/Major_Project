@@ -56,15 +56,15 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const result = await signup(username, email, password);
       
-      if (signup(username, password)) {
+      if (result.success) {
         setSuccess(true);
         setTimeout(() => {
           navigate('/dashboard');
         }, 1000);
       } else {
-        setError('Username already exists. Please try another.');
+        setError(result.error || 'Registration failed. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

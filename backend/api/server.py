@@ -9,9 +9,11 @@ import threading
 import math
 from pathlib import Path
 
+import io
+import datetime
 import cv2
 import numpy as np
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_file, g
 from flask_cors import CORS
 import asyncio
 import uuid
@@ -51,9 +53,16 @@ from backend.app.annotator import annotate_frame
 from backend.app.notifier import PostureNotifier
 from backend.app.reporter import SessionReporter
 from backend.telemetry.logger import TelemetryLogger
+from backend.auth.routes import auth_bp, require_auth
+from backend.db.mongo import sessions_col, get_fs
+from backend.api.sessions_routes import sessions_bp
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# Register Blueprints
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(sessions_bp, url_prefix='/api/sessions')
 
 # ---------------------------------------------------------------------------
 # Shared State
@@ -75,6 +84,8 @@ class MonitorState:
         self.last_break_time = 0
         self.last_water_time = 0
         self.pdf_generating = False
+        self.user_id = None
+        self.session_id = None
 
 state = MonitorState()
 
@@ -102,7 +113,7 @@ class MonitorVideoTrack(VideoStreamTrack):
                 if state.latest_frame is not None:
                     frame = state.latest_frame.copy()
                     break
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.005)
 
         # aiortc handles BGR conversion
         video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
@@ -120,9 +131,12 @@ def _monitor_loop():
     safety_engine = SafetyEngine(reference_profile=pipeline.reference)
     notifier = PostureNotifier(enabled=True)
     reporter = SessionReporter()
-    telemetry_logger = TelemetryLogger()
+    telemetry_logger = TelemetryLogger(
+        session_id=state.session_id,
+        user_id=state.user_id,
+    )
 
-    # Open camera
+    # Open camera with zero buffer latency settings
     if sys.platform.startswith('win'):
         cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     else:
@@ -133,6 +147,12 @@ def _monitor_loop():
         with state.lock:
             state.running = False
         return
+
+    # DirectShow / Camera buffer optimization: set 640x480 & buffer size = 1 to eliminate frame backlog
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
 
     start_time = time.time()
     frame_count = 0
@@ -146,11 +166,16 @@ def _monitor_loop():
         state.rule_20_active = False
         state.water_active = False
 
-    print("[+] Vision pipeline running. Streaming to React frontend...")
+    print("[+] Vision pipeline running with sub-80ms zero-latency buffer settings...")
 
     try:
         while not state.stop_event.is_set() and cap.isOpened():
-            ret, frame = cap.read()
+            # Flush stale buffered frames to ensure we process the latest live frame
+            cap.grab()
+            ret, frame = cap.retrieve()
+            if not ret or frame is None:
+                ret, frame = cap.read()
+
             if not ret or frame is None:
                 break
 
@@ -262,17 +287,55 @@ def _monitor_loop():
         # --- Auto-generate PDF ---
         state.pdf_generating = True
         print("\n[..] Generating Gemini AI & PDF Ergonomic Report...")
+        pdf_gridfs_id = None
         try:
             import subprocess
             cmd = [sys.executable, str(PROJECT_ROOT / "generate_ai_pdf_report.py"),
                    "--telemetry", str(telemetry_logger.log_file)]
             subprocess.run(cmd, check=True)
-            state.pdf_path = str(PROJECT_ROOT / "Ergonomic_Report.pdf")
-            print(f"[+] PDF saved to: {state.pdf_path}")
+            pdf_path_obj = PROJECT_ROOT / "Ergonomic_Report.pdf"
+            if pdf_path_obj.exists():
+                state.pdf_path = str(pdf_path_obj)
+                print(f"[+] PDF saved to: {state.pdf_path}")
+                # Store PDF in MongoDB GridFS
+                try:
+                    fs = get_fs()
+                    with open(pdf_path_obj, "rb") as pdf_file:
+                        pdf_gridfs_id = fs.put(
+                            pdf_file.read(),
+                            filename=f"report_{state.session_id or 'session'}.pdf",
+                            content_type="application/pdf",
+                            session_id=state.session_id,
+                            user_id=state.user_id,
+                            created_at=datetime.datetime.utcnow()
+                        )
+                    print(f"[+] PDF stored in GridFS id: {pdf_gridfs_id}")
+                except Exception as gfs_err:
+                    print(f"[!] Warning: GridFS upload failed: {gfs_err}")
         except Exception as e:
             print(f"[!] PDF generation error: {e}")
         finally:
             state.pdf_generating = False
+
+        # Update session document in MongoDB
+        if state.session_id:
+            try:
+                from bson import ObjectId
+                col = sessions_col()
+                ended_at = datetime.datetime.utcnow()
+                update_fields = {
+                    "ended_at": ended_at,
+                    "duration_sec": round(elapsed, 1),
+                    "frame_count": frame_count,
+                    "status": "completed",
+                    "final_stats": state.session_stats,
+                }
+                if pdf_gridfs_id:
+                    update_fields["pdf_gridfs_id"] = str(pdf_gridfs_id)
+                col.update_one({"_id": ObjectId(state.session_id)}, {"$set": update_fields})
+                print(f"[+] Session {state.session_id} updated in MongoDB.")
+            except Exception as s_err:
+                print(f"[!] Warning: Failed to update session in MongoDB: {s_err}")
 
         with state.lock:
             state.running = False
@@ -285,20 +348,43 @@ def _monitor_loop():
 # ---------------------------------------------------------------------------
 
 @app.route('/api/start', methods=['POST'])
+@require_auth
 def start_monitor():
+    user_id = g.user_id
     with state.lock:
         if state.running:
             return jsonify({"status": "already_running"}), 200
+
+        # Create session in MongoDB
+        session_id = None
+        try:
+            col = sessions_col()
+            now = datetime.datetime.utcnow()
+            res = col.insert_one({
+                "user_id": user_id,
+                "started_at": now,
+                "ended_at": None,
+                "duration_sec": 0.0,
+                "frame_count": 0,
+                "status": "running",
+            })
+            session_id = str(res.inserted_id)
+        except Exception as e:
+            print(f"[!] Warning: Failed to create session in MongoDB: {e}")
+
         state.running = True
+        state.user_id = user_id
+        state.session_id = session_id
         state.pdf_generating = False
         state.pdf_path = None
         state.session_stats = {}
         state.stop_event.clear()
     threading.Thread(target=_monitor_loop, daemon=True).start()
-    return jsonify({"status": "started"}), 200
+    return jsonify({"status": "started", "session_id": session_id}), 200
 
 
 @app.route('/api/stop', methods=['POST'])
+@require_auth
 def stop_monitor():
     with state.lock:
         if not state.running:
@@ -322,6 +408,7 @@ def dismiss_alert():
 
 
 @app.route('/api/status', methods=['GET'])
+@require_auth
 def get_status():
     return jsonify(sanitize_for_json({
         "running": state.running,
@@ -329,6 +416,21 @@ def get_status():
         "pdf_path": state.pdf_path,
         "stats": state.session_stats,
     })), 200
+
+
+@app.route('/api/download_pdf', methods=['GET'])
+@require_auth
+def download_pdf():
+    pdf_file = PROJECT_ROOT / "Ergonomic_Report.pdf"
+    if pdf_file.exists():
+        return send_file(
+            str(pdf_file),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="Ergonomic_Report.pdf"
+        )
+    return jsonify({"error": "Report PDF not found. Please stop a monitor session first."}), 404
+
 
 
 def _generate_mjpeg():

@@ -15,9 +15,18 @@ class TelemetryLogger:
     """
     Frame-by-frame telemetry recorder for logging continuous monitoring data.
     """
-    def __init__(self, logs_dir: Optional[Path] = None, filename: Optional[str] = None):
+    def __init__(
+        self,
+        logs_dir: Optional[Path] = None,
+        filename: Optional[str] = None,
+        session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ):
         self.logs_dir = logs_dir or DEFAULT_LOGS_DIR
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.session_id = session_id
+        self.user_id = user_id
+        self._records_buffer = []
 
         if not filename:
             timestr = time.strftime("%Y%m%d_%H%M%S")
@@ -62,8 +71,14 @@ class TelemetryLogger:
         self._f.write(line)
         self._f.flush()
 
+        if self.session_id:
+            mongo_record = dict(record)
+            mongo_record["session_id"] = self.session_id
+            mongo_record["user_id"] = self.user_id
+            self._records_buffer.append(mongo_record)
+
     def close(self):
-        """Close log file and update latest_telemetry.jsonl symlink/copy."""
+        """Close log file, update latest_telemetry.jsonl, and sync records to MongoDB."""
         if hasattr(self, "_f") and self._f and not self._f.closed:
             self._f.close()
 
@@ -74,3 +89,14 @@ class TelemetryLogger:
                 shutil.copyfile(self.log_file, self.latest_log_file)
         except Exception:
             pass
+
+        # Sync telemetry records to MongoDB
+        if self._records_buffer:
+            try:
+                from backend.db.mongo import telemetry_col
+                telemetry_col().insert_many(self._records_buffer, ordered=False)
+                print(f"[+] Synced {len(self._records_buffer)} telemetry records to MongoDB.")
+            except Exception as e:
+                print(f"[!] Warning: Failed to sync telemetry to MongoDB: {e}")
+            finally:
+                self._records_buffer.clear()

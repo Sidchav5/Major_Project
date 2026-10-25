@@ -118,7 +118,12 @@ def main():
     print(f"[..] Loading frame telemetry from: {args.telemetry}")
     records = load_telemetry(args.telemetry)
     if not records:
-        print("[!] Error: No valid telemetry records found. Run backend/app/main.py first.")
+        latest_file = PROJECT_ROOT / "logs" / "latest_telemetry.jsonl"
+        if latest_file.exists():
+            print(f"[..] Fallback: Loading telemetry from {latest_file}")
+            records = load_telemetry(latest_file)
+    if not records:
+        print("[!] Error: No valid telemetry records found.")
         sys.exit(1)
 
     print(f"[+] Loaded {len(records)} frame records.")
