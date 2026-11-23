@@ -430,6 +430,13 @@
   min-height: 20px;
 }
 
+.chart-bar.inactive {
+  min-height: 0;
+  height: 0;
+  border: 0;
+  animation: none;
+}
+
 @keyframes barGrow {
   from { height: 0 !important; }
   to { height: var(--height); }
