@@ -3,6 +3,14 @@ import api from '../utils/api';
 
 const AuthContext = createContext(null);
 
+const normalizeUser = (user) => {
+  if (!user) return null;
+  return {
+    ...user,
+    displayName: user.displayName || user.name || (user.email ? user.email.split('@')[0] : 'User'),
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,7 +23,7 @@ export const AuthProvider = ({ children }) => {
           const res = await api.get('/api/auth/me');
           if (res.ok) {
             const data = await res.json();
-            setUser({ token, id: data.id, name: data.name, email: data.email });
+            setUser(normalizeUser({ token, id: data.id, name: data.name, email: data.email }));
           } else {
             // Token expired or invalid
             localStorage.removeItem('ergonomics_token');
@@ -40,7 +48,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error || 'Login failed' };
       }
       localStorage.setItem('ergonomics_token', data.token);
-      setUser({ token: data.token, ...data.user });
+      setUser(normalizeUser({ token: data.token, ...data.user }));
       return { success: true };
     } catch (err) {
       return { success: false, error: 'Network error. Please try again.' };
@@ -55,7 +63,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error || 'Registration failed' };
       }
       localStorage.setItem('ergonomics_token', data.token);
-      setUser({ token: data.token, ...data.user });
+      setUser(normalizeUser({ token: data.token, ...data.user }));
       return { success: true };
     } catch (err) {
       return { success: false, error: 'Network error. Please try again.' };
