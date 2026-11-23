@@ -105,6 +105,31 @@ class TestTelemetryLogger(unittest.TestCase):
             latest_path = os.path.join(tmp_dir, "latest_telemetry.jsonl")
             self.assertTrue(os.path.exists(latest_path))
 
+    def test_close_deletes_old_session_logs(self):
+        """Verify close keeps only the latest session JSONL plus latest copy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            logs_dir = Path(tmp_dir)
+            old_files = [
+                logs_dir / "telemetry_20261120_120000.jsonl",
+                logs_dir / "telemetry_20261121_120000.jsonl",
+            ]
+            for old_file in old_files:
+                old_file.write_text('{"frame_index": 1}\n', encoding="utf-8")
+
+            logger = TelemetryLogger(
+                logs_dir=logs_dir,
+                filename="telemetry_20261123_120000.jsonl",
+            )
+            logger.log_frame(
+                {"face_detected": True},
+                {"final_status": "SAFE", "reasons": []},
+            )
+            logger.close()
+
+            remaining = list(logs_dir.glob("telemetry_*.jsonl"))
+            self.assertEqual(remaining, [logger.log_file])
+            self.assertTrue(logger.latest_log_file.exists())
+
     def test_mongo_sync_uses_one_bucket_per_second(self):
         """Verify MongoDB persistence is aggregated instead of frame-level."""
         with tempfile.TemporaryDirectory() as tmp_dir:

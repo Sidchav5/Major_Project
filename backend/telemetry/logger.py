@@ -5,6 +5,7 @@ Records frame-by-frame ergonomic measurements, safety statuses, and wellness ale
 
 import json
 import math
+import os
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -49,6 +50,13 @@ class TelemetryLogger:
             ThreadPoolExecutor(max_workers=1, thread_name_prefix="telemetry-sync")
             if self.session_id else None
         )
+        try:
+            self.retention_count = max(
+                1,
+                int(os.getenv("TELEMETRY_LOG_RETENTION_COUNT", "1")),
+            )
+        except (TypeError, ValueError):
+            self.retention_count = 1
 
     def log_frame(self, result: Dict[str, Any], decision: Dict[str, Any]):
         """
@@ -177,6 +185,29 @@ class TelemetryLogger:
         from backend.db.mongo import telemetry_col
         telemetry_col().insert_one(document)
 
+    def prune_old_logs(self) -> int:
+        """Keep the current JSONL and a configurable number of recent backups."""
+        candidates = sorted(
+            self.logs_dir.glob("telemetry_*.jsonl"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        keep = {self.log_file.resolve()}
+        for path in candidates:
+            if len(keep) >= self.retention_count:
+                break
+            keep.add(path.resolve())
+
+        removed = 0
+        for path in candidates:
+            if path.resolve() not in keep:
+                try:
+                    path.unlink()
+                    removed += 1
+                except OSError as exc:
+                    print(f"[!] Warning: Failed to delete old telemetry log {path.name}: {exc}")
+        return removed
+
     def close(self):
         """Close log file, update latest_telemetry.jsonl, and sync records to MongoDB."""
         if hasattr(self, "_f") and self._f and not self._f.closed:
@@ -190,6 +221,10 @@ class TelemetryLogger:
                 shutil.copyfile(self.log_file, self.latest_log_file)
         except Exception:
             pass
+
+        removed = self.prune_old_logs()
+        if removed:
+            print(f"[+] Retention cleanup deleted {removed} old telemetry log(s).")
 
         if self._mongo_bucket:
             self._queue_bucket(self._mongo_bucket)

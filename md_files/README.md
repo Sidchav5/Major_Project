@@ -80,6 +80,9 @@ A comprehensive, real-time AI-powered ergonomic posture, screen distance, and di
 ### Telemetry Storage Strategy
 - Every processed frame is kept in the local session JSONL file while a session is
   running, so the PDF generator can render detailed time-series charts.
+- When a session closes, old `telemetry_*.jsonl` files are deleted automatically.
+  By default only the latest session JSONL and `latest_telemetry.jsonl` are kept;
+  set `TELEMETRY_LOG_RETENTION_COUNT` to retain a larger local history.
 - MongoDB stores one asynchronous aggregate document per second, including sample
   count, averages, dominant status, and reason counts. This keeps session history
   and analytics useful without storing a document for every camera frame.
