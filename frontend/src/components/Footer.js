@@ -56,8 +56,8 @@ function Footer() {
             </div>
             <div className="footer-links-column">
               <h4>Contact</h4>
-              <a href="mailto:info@aiergonomics.com">
-                <Mail size={16} className="contact-icon" /> info@aiergonomics.com
+              <a href="mailto:connect@navanveshafoundation.org.com">
+                <Mail size={16} className="contact-icon" /> connect@navanveshafoundation.org.com
               </a>
               <a href="tel:+1234567890">
                 <Phone size={16} className="contact-icon" /> +1 (234) 567-890
