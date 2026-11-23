@@ -252,7 +252,8 @@ def get_analytics_summary():
             "distribution": {"safe": 0, "warning": 0, "danger": 0},
             "posture_distribution": {"SAFE": 0, "WARNING": 0, "DANGER": 0},
             "weekly_trend": [0, 0, 0, 0, 0, 0, 0],
-            "trend_labels": []
+            "trend_labels": [],
+            "trend_active": [False, False, False, False, False, False, False]
         }), 200
 
     total_duration_sec = sum(s.get("duration_sec", 0) for s in sessions)
@@ -326,7 +327,7 @@ def get_analytics_summary():
                 bucket_key = started_at.date().isoformat()
             posture_scores_by_date.setdefault(bucket_key, []).append(score)
 
-    avg_score = round(sum(scores) / len(scores)) if scores else 90
+    avg_score = round(sum(scores) / len(scores), 1) if scores else 0
 
     # Calculate real posture distribution percentages
     total_posture_marks = sum(posture_counts.values()) or 1
@@ -372,11 +373,13 @@ def get_analytics_summary():
     # the user's average, which would falsely imply activity on inactive days.
     trend_labels = []
     weekly_trend = []
+    trend_active = []
     if period == "day":
         for hour in range(0, 24, 4):
             bucket_key = f"hour-{hour:02d}"
             bucket_scores = posture_scores_by_date.get(bucket_key, [])
             trend_labels.append(f"{hour:02d}:00")
+            trend_active.append(bool(bucket_scores))
             weekly_trend.append(
                 round(sum(bucket_scores) / len(bucket_scores), 1) if bucket_scores else 0
             )
@@ -386,6 +389,7 @@ def get_analytics_summary():
             bucket_scores = posture_scores_by_date.get(bucket_key, [])
             start_day = today - timedelta(days=29 - bucket_index * 5)
             trend_labels.append(start_day.strftime("%d %b"))
+            trend_active.append(bool(bucket_scores))
             weekly_trend.append(
                 round(sum(bucket_scores) / len(bucket_scores), 1) if bucket_scores else 0
             )
@@ -395,6 +399,7 @@ def get_analytics_summary():
             date_key = (today - timedelta(days=offset)).isoformat()
             day_scores = posture_scores_by_date.get(date_key, [])
             trend_labels.append((today - timedelta(days=offset)).strftime("%a"))
+            trend_active.append(bool(day_scores))
             weekly_trend.append(
                 round(sum(day_scores) / len(day_scores), 1) if day_scores else 0
             )
@@ -416,5 +421,6 @@ def get_analytics_summary():
         },
         "posture_distribution": posture_counts,
         "weekly_trend": weekly_trend,
-        "trend_labels": trend_labels
+        "trend_labels": trend_labels,
+        "trend_active": trend_active
     }), 200

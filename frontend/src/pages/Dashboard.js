@@ -312,14 +312,16 @@ export default function Dashboard() {
                     {(analytics?.weekly_trend || [0, 0, 0, 0, 0, 0, 0]).map((value, index) => (
                       <div key={index} className="chart-bar-wrapper">
                         <div 
-                          className="chart-bar"
+                          className={`chart-bar ${analytics?.trend_active?.[index] ? '' : 'inactive'}`}
                           style={{ 
-                            height: `${value}%`,
-                            backgroundColor: getScoreColor(value),
+                            height: analytics?.trend_active?.[index] ? `${value}%` : '0%',
+                            backgroundColor: analytics?.trend_active?.[index] ? getScoreColor(value) : 'transparent',
                             animationDelay: `${index * 0.1}s`
                           }}
                         >
-                          <span className="bar-label">{value}%</span>
+                          {analytics?.trend_active?.[index] && (
+                            <span className="bar-label">{value}%</span>
+                          )}
                         </div>
                         <span className="bar-day">
                           {analytics?.trend_labels?.[index] || `Day ${index + 1}`}

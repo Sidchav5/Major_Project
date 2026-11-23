@@ -53,9 +53,15 @@ export default function Reports() {
           const mins = Math.max(1, Math.round((s.duration_sec || 0) / 60));
           const statusRaw = (s.final_stats?.status || s.status || 'SAFE').toUpperCase();
           
-          let score = 94;
-          let uiStatus = 'excellent';
-          if (statusRaw === 'WARNING') {
+          let score = 0;
+          let uiStatus = 'good';
+          if (typeof s.final_stats?.posture_score === 'number') {
+            score = Math.round(s.final_stats.posture_score);
+            if (score >= 90) uiStatus = 'excellent';
+            else if (score >= 75) uiStatus = 'good';
+            else if (score >= 60) uiStatus = 'fair';
+            else uiStatus = 'poor';
+          } else if (statusRaw === 'WARNING') {
             score = 75;
             uiStatus = 'fair';
           } else if (statusRaw === 'DANGER') {
