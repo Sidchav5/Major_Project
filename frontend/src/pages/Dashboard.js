@@ -58,9 +58,9 @@ export default function Dashboard() {
           const mins = Math.max(1, Math.round((s.duration_sec || 0) / 60));
           const statusRaw = (s.final_stats?.status || s.status || 'SAFE').toUpperCase();
           
-          let score = 94;
-          let postureText = 'Good';
-          let statusText = 'Excellent';
+          let score = 0;
+          let postureText = 'No data';
+          let statusText = 'No data';
           if (typeof s.final_stats?.posture_score === 'number') {
             score = Math.round(s.final_stats.posture_score);
             if (score >= 90) {
@@ -81,6 +81,10 @@ export default function Dashboard() {
             score = 55;
             postureText = 'Poor';
             statusText = 'Poor';
+          } else if (statusRaw === 'SAFE') {
+            score = 0;
+            postureText = 'No data';
+            statusText = 'No data';
           }
 
           return {
@@ -122,7 +126,7 @@ export default function Dashboard() {
   const stats = [
     { 
       name: 'Posture Score', 
-      value: `${analytics?.avg_posture_score || 94}%`, 
+      value: `${analytics?.total_sessions ? analytics.avg_posture_score : 0}%`,
       change: '+5.2%',
       trend: 'up',
       icon: Activity, 
@@ -339,9 +343,9 @@ export default function Dashboard() {
               </div>
               <div className="chart-body">
                 {(() => {
-                  const safe = analytics?.distribution?.safe ?? 70;
-                  const warning = analytics?.distribution?.warning ?? 20;
-                  const danger = analytics?.distribution?.danger ?? 10;
+                  const safe = analytics?.distribution?.safe ?? 0;
+                  const warning = analytics?.distribution?.warning ?? 0;
+                  const danger = analytics?.distribution?.danger ?? 0;
                   const endSafe = safe;
                   const endWarning = Math.min(100, safe + warning);
 
@@ -356,7 +360,9 @@ export default function Dashboard() {
                           }}
                         ></div>
                         <div className="donut-center">
-                          <span className="donut-value">{analytics?.avg_posture_score || 94}%</span>
+                          <span className="donut-value">
+                            {analytics?.total_sessions ? analytics.avg_posture_score : 0}%
+                          </span>
                           <span className="donut-label">Average</span>
                         </div>
                       </div>

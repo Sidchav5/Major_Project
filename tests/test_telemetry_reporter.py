@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.telemetry.logger import TelemetryLogger
 from backend.app.reporter import SessionReporter
+from backend.api.sessions_routes import _posture_score_from_telemetry
 
 
 class TestTelemetryLogger(unittest.TestCase):
@@ -173,6 +174,18 @@ class TestSessionReporter(unittest.TestCase):
             reporter = SessionReporter(output_dir=Path(tmp_dir))
             report = reporter.generate_report()
             self.assertEqual(report, "No frames processed during session.")
+
+
+class TestPostureAnalytics(unittest.TestCase):
+    def test_calculates_score_from_status_distribution(self):
+        records = [
+            {"status_counts": {"SAFE": 6, "WARNING": 2, "NON-SAFE": 2}},
+            {"status_counts": {"SAFE": 8, "WARNING": 1, "NON-SAFE": 1}},
+        ]
+        self.assertEqual(_posture_score_from_telemetry(records), 77.5)
+
+    def test_missing_telemetry_returns_none(self):
+        self.assertIsNone(_posture_score_from_telemetry([]))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,33 @@ from backend.auth.routes import require_auth
 sessions_bp = Blueprint("sessions", __name__)
 
 
+def _posture_score_from_telemetry(records):
+    """Calculate the same SAFE/WARNING/ NON-SAFE weighted score as PDF reports."""
+    safe_count = 0
+    warning_count = 0
+    total_count = 0
+
+    for record in records:
+        status_counts = record.get("status_counts") or {}
+        if status_counts:
+            record_total = sum(
+                int(count) for count in status_counts.values()
+                if isinstance(count, (int, float))
+            )
+        else:
+            record_total = int(record.get("sample_count", 1) or 1)
+            status = str(record.get("final_status", "UNKNOWN")).upper()
+            status_counts = {status: record_total}
+
+        total_count += record_total
+        safe_count += int(status_counts.get("SAFE", 0))
+        warning_count += int(status_counts.get("WARNING", 0))
+
+    if total_count <= 0:
+        return None
+    return round(((safe_count + (0.5 * warning_count)) / total_count) * 100.0, 1)
+
+
 # ---------------------------------------------------------------------------
 # GET /api/sessions — List all sessions for the logged-in user
 # ---------------------------------------------------------------------------
@@ -216,13 +243,13 @@ def get_analytics_summary():
             "period": period,
             "total_sessions": 0,
             "total_monitoring_minutes": 0,
-            "avg_posture_score": 90,
+            "avg_posture_score": 0,
             "excellent_count": 0,
             "needs_work_count": 0,
             "safety_violations": 0,
             "avg_blink_rate": 15.0,
             "avg_distance_cm": 60.0,
-            "distribution": {"safe": 70, "warning": 20, "danger": 10},
+            "distribution": {"safe": 0, "warning": 0, "danger": 0},
             "posture_distribution": {"SAFE": 0, "WARNING": 0, "DANGER": 0},
             "weekly_trend": [0, 0, 0, 0, 0, 0, 0],
             "trend_labels": []
@@ -238,14 +265,25 @@ def get_analytics_summary():
     violations_count = 0
     posture_counts = {"SAFE": 0, "WARNING": 0, "DANGER": 0}
     posture_scores_by_date = {}
+    session_ids = [str(s["_id"]) for s in sessions]
+    telemetry_for_sessions = t_col.find(
+        {"session_id": {"$in": session_ids}, "user_id": g.user_id},
+        {
+            "session_id": 1,
+            "status_counts": 1,
+            "sample_count": 1,
+            "final_status": 1,
+            "_id": 0,
+        },
+    )
+
+    records_by_session = {}
+    for record in telemetry_for_sessions:
+        records_by_session.setdefault(str(record["session_id"]), []).append(record)
 
     for s in sessions:
         stats = s.get("final_stats", {})
         status = stats.get("status", "SAFE").upper()
-        if status in posture_counts:
-            posture_counts[status] += 1
-        else:
-            posture_counts["SAFE"] += 1
 
         calculated_score = stats.get("posture_score")
         try:
@@ -253,22 +291,28 @@ def get_analytics_summary():
         except (TypeError, ValueError):
             calculated_score = None
 
+        session_records = records_by_session.get(str(s["_id"]), [])
+        telemetry_score = _posture_score_from_telemetry(session_records)
+        if telemetry_score is not None:
+            calculated_score = telemetry_score
+
         if calculated_score is not None:
             score = max(0, min(100, calculated_score))
-        elif status == "SAFE":
-            score = 94
+        else:
+            continue
+        scores.append(score)
+
+        if score >= 90:
+            posture_counts["SAFE"] += 1
             excellent_count += 1
-        elif status == "WARNING":
-            score = 75
+        elif score >= 60:
+            posture_counts["WARNING"] += 1
             needs_work_count += 1
             violations_count += 1
-        elif status == "DANGER":
-            score = 55
+        else:
+            posture_counts["DANGER"] += 1
             needs_work_count += 1
             violations_count += 2
-        else:
-            score = 85
-        scores.append(score)
 
         started_at = s.get("started_at")
         if started_at:
