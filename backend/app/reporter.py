@@ -140,3 +140,31 @@ class SessionReporter:
             print(f"[!] Could not save report file: {e}")
 
         return report_str
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Return compact summary statistics for database persistence."""
+        elapsed_sec = time.time() - self.start_time
+        if self.total_frames == 0:
+            return {
+                "frame_count": 0,
+                "elapsed_sec": round(elapsed_sec, 1),
+                "status": "UNKNOWN",
+                "posture_score": 0,
+            }
+
+        safe_cnt = self.status_counts.get("SAFE", 0)
+        warn_cnt = self.status_counts.get("WARNING", 0)
+        posture_score = round(
+            ((safe_cnt + 0.5 * warn_cnt) / self.total_frames) * 100.0,
+            1,
+        )
+        status = "SAFE" if safe_cnt == self.total_frames else (
+            "WARNING" if warn_cnt >= self.status_counts.get("NON-SAFE", 0)
+            else "DANGER"
+        )
+        return {
+            "frame_count": self.total_frames,
+            "elapsed_sec": round(elapsed_sec, 1),
+            "status": status,
+            "posture_score": posture_score,
+        }

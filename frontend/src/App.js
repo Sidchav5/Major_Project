@@ -10,6 +10,8 @@ import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import LiveFeed from './pages/LiveFeed';
 import Reports from './pages/Reports';
+import Activity from './pages/Activity';
+import Achievements from './pages/Achievements';
 
 function App() {
   return (
@@ -26,6 +28,8 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/live" element={<LiveFeed />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/achievements" element={<Achievements />} />
           </Route>
           
           {/* Fallback */}

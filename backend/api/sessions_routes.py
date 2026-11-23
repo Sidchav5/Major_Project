@@ -224,17 +224,20 @@ def get_analytics_summary():
             "avg_distance_cm": 60.0,
             "distribution": {"safe": 70, "warning": 20, "danger": 10},
             "posture_distribution": {"SAFE": 0, "WARNING": 0, "DANGER": 0},
-            "weekly_trend": [88, 92, 85, 90, 95, 89, 90]
+            "weekly_trend": [0, 0, 0, 0, 0, 0, 0],
+            "trend_labels": []
         }), 200
 
     total_duration_sec = sum(s.get("duration_sec", 0) for s in sessions)
     total_monitoring_minutes = round(total_duration_sec / 60, 1)
+    today = now.date()
 
     scores = []
     excellent_count = 0
     needs_work_count = 0
     violations_count = 0
     posture_counts = {"SAFE": 0, "WARNING": 0, "DANGER": 0}
+    posture_scores_by_date = {}
 
     for s in sessions:
         stats = s.get("final_stats", {})
@@ -244,7 +247,15 @@ def get_analytics_summary():
         else:
             posture_counts["SAFE"] += 1
 
-        if status == "SAFE":
+        calculated_score = stats.get("posture_score")
+        try:
+            calculated_score = round(float(calculated_score), 1)
+        except (TypeError, ValueError):
+            calculated_score = None
+
+        if calculated_score is not None:
+            score = max(0, min(100, calculated_score))
+        elif status == "SAFE":
             score = 94
             excellent_count += 1
         elif status == "WARNING":
@@ -258,6 +269,18 @@ def get_analytics_summary():
         else:
             score = 85
         scores.append(score)
+
+        started_at = s.get("started_at")
+        if started_at:
+            if period == "day":
+                bucket_key = f"hour-{(started_at.hour // 4) * 4:02d}"
+            elif period == "month":
+                age_days = max(0, min(29, (today - started_at.date()).days))
+                bucket_index = min(6, (29 - age_days) // 5)
+                bucket_key = f"bucket-{bucket_index}"
+            else:
+                bucket_key = started_at.date().isoformat()
+            posture_scores_by_date.setdefault(bucket_key, []).append(score)
 
     avg_score = round(sum(scores) / len(scores)) if scores else 90
 
@@ -301,11 +324,36 @@ def get_analytics_summary():
                 / sum(count for _, count in weighted_blinks), 1
             )
 
-    # Compute trend values (last 7 points or padded with average)
-    weekly_trend = scores[:7]
-    while len(weekly_trend) < 7:
-        weekly_trend.insert(0, avg_score)
-    weekly_trend.reverse()
+    # Build a real seven-point trend. Missing periods are 0, never padded with
+    # the user's average, which would falsely imply activity on inactive days.
+    trend_labels = []
+    weekly_trend = []
+    if period == "day":
+        for hour in range(0, 24, 4):
+            bucket_key = f"hour-{hour:02d}"
+            bucket_scores = posture_scores_by_date.get(bucket_key, [])
+            trend_labels.append(f"{hour:02d}:00")
+            weekly_trend.append(
+                round(sum(bucket_scores) / len(bucket_scores), 1) if bucket_scores else 0
+            )
+    elif period == "month":
+        for bucket_index in range(7):
+            bucket_key = f"bucket-{bucket_index}"
+            bucket_scores = posture_scores_by_date.get(bucket_key, [])
+            start_day = today - timedelta(days=29 - bucket_index * 5)
+            trend_labels.append(start_day.strftime("%d %b"))
+            weekly_trend.append(
+                round(sum(bucket_scores) / len(bucket_scores), 1) if bucket_scores else 0
+            )
+    else:
+        today = now.date()
+        for offset in range(6, -1, -1):
+            date_key = (today - timedelta(days=offset)).isoformat()
+            day_scores = posture_scores_by_date.get(date_key, [])
+            trend_labels.append((today - timedelta(days=offset)).strftime("%a"))
+            weekly_trend.append(
+                round(sum(day_scores) / len(day_scores), 1) if day_scores else 0
+            )
 
     return jsonify({
         "period": period,
@@ -323,5 +371,6 @@ def get_analytics_summary():
             "danger": danger_pct
         },
         "posture_distribution": posture_counts,
-        "weekly_trend": weekly_trend
+        "weekly_trend": weekly_trend,
+        "trend_labels": trend_labels
     }), 200
