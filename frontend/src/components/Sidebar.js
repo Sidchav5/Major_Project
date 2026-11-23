@@ -8,16 +8,9 @@ import {
   FileText, 
   LogOut, 
   Shield, 
-  Settings,
-  HelpCircle,
-  User,
-  Bell,
-  ChevronDown,
   ChevronRight,
   Activity,
-  Zap,
   Award,
-  Clock
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -25,7 +18,6 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
   const { logout, user } = useAuth();
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
   useEffect(() => {
@@ -84,12 +76,6 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
     },
   ];
 
-  const settingsItems = [
-    { name: 'Profile', href: '/profile', icon: User },
-    { name: 'Notifications', href: '/notifications', icon: Bell },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
-
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
       logout();
@@ -142,40 +128,15 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
           <div className="sidebar-user-profile">
             <div className="user-avatar-wrapper">
               <img 
-                src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=2563eb&color=fff&size=40`} 
-                alt={user?.displayName || 'User'}
+                src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName || user?.name || 'User'}&background=2563eb&color=fff&size=40`}
+                alt={user?.displayName || user?.name || 'User'}
                 className="user-avatar"
               />
               <span className="user-status online"></span>
             </div>
             <div className="user-info">
-              <span className="user-name">{user?.displayName || 'Guest User'}</span>
-              <span className="user-role">Administrator</span>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Stats */}
-        {isExpanded && (
-          <div className="sidebar-stats">
-            <div className="stat-item">
-              <div className="stat-icon-wrapper">
-                <Zap className="stat-icon" />
-              </div>
-              <div className="stat-content">
-                <span className="stat-value">98%</span>
-                <span className="stat-label">Accuracy</span>
-              </div>
-            </div>
-            <div className="stat-divider"></div>
-            <div className="stat-item">
-              <div className="stat-icon-wrapper">
-                <Clock className="stat-icon" />
-              </div>
-              <div className="stat-content">
-                <span className="stat-value">2.5K</span>
-                <span className="stat-label">Sessions</span>
-              </div>
+              <span className="user-name">{user?.displayName || user?.name || 'User'}</span>
+              <span className="user-role">User</span>
             </div>
           </div>
         )}
@@ -217,47 +178,7 @@ export default function Sidebar({ isMobileOpen = false, onClose = () => {} }) {
             </ul>
           </div>
 
-          {/* Settings Section */}
-          <div className="nav-section">
-            {isExpanded && <span className="nav-section-title">Settings</span>}
-            <ul className="nav-list">
-              {settingsItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.href;
-                return (
-                  <li key={item.name}>
-                    <NavLink
-                      to={item.href}
-                      className={`nav-item ${isActive ? 'active' : ''}`}
-                      onClick={() => isMobile && onClose()}
-                    >
-                      <span className="nav-icon-wrapper">
-                        <Icon className="nav-icon" />
-                      </span>
-                      {isExpanded && (
-                        <span className="nav-name">{item.name}</span>
-                      )}
-                    </NavLink>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
         </nav>
-
-        {/* Help & Support */}
-        {isExpanded && (
-          <div className="sidebar-help">
-            <div className="help-card">
-              <HelpCircle className="help-icon" />
-              <div className="help-content">
-                <span className="help-title">Need Help?</span>
-                <span className="help-text">Check our documentation</span>
-              </div>
-              <button className="help-btn">Learn More</button>
-            </div>
-          </div>
-        )}
 
         {/* Logout Button */}
         <div className="sidebar-footer">

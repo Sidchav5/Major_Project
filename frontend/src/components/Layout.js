@@ -112,15 +112,15 @@ export default function Layout() {
             <div className="header-profile">
               <div className="profile-avatar">
                 <img 
-                  src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=2563eb&color=fff&size=32`} 
-                  alt={user?.displayName || 'User'}
+                  src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName || user?.name || 'User'}&background=2563eb&color=fff&size=32`}
+                  alt={user?.displayName || user?.name || 'User'}
                   className="avatar-image"
                 />
                 <span className="avatar-status online"></span>
               </div>
               <div className="profile-info">
-                <span className="profile-name">{user?.displayName || 'User'}</span>
-                <span className="profile-role">Admin</span>
+                <span className="profile-name">{user?.displayName || user?.name || 'User'}</span>
+                <span className="profile-role">User</span>
               </div>
               <button 
                 className="profile-dropdown-btn"
@@ -155,7 +155,7 @@ export default function Layout() {
                    location.pathname.split('/').pop().slice(1)}
                 </h1>
                 <p className="page-subtitle">
-                  Welcome back, {user?.displayName || 'User'}! Here's what's happening with your ergonomics.
+                  Welcome back, {user?.displayName || user?.name || 'User'}! Here's what's happening with your ergonomics.
                 </p>
               </div>
               <div className="page-header-right">
