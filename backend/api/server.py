@@ -293,6 +293,7 @@ def _monitor_loop():
 
         print(f"\n[+] Shutdown. {frame_count} frames in {elapsed:.2f}s.")
         print("\n" + reporter.generate_report())
+        reporter_summary = reporter.get_summary()
 
         # --- Auto-generate PDF ---
         state.pdf_generating = True
@@ -338,7 +339,13 @@ def _monitor_loop():
                     "duration_sec": round(elapsed, 1),
                     "frame_count": frame_count,
                     "status": "completed",
-                    "final_stats": state.session_stats,
+                    "final_stats": {
+                        **state.session_stats,
+                        "frame_count": reporter_summary["frame_count"],
+                        "elapsed_sec": reporter_summary["elapsed_sec"],
+                        "status": reporter_summary["status"],
+                        "posture_score": reporter_summary["posture_score"],
+                    },
                 }
                 if pdf_gridfs_id:
                     update_fields["pdf_gridfs_id"] = str(pdf_gridfs_id)

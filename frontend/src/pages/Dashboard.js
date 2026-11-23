@@ -61,7 +61,19 @@ export default function Dashboard() {
           let score = 94;
           let postureText = 'Good';
           let statusText = 'Excellent';
-          if (statusRaw === 'WARNING') {
+          if (typeof s.final_stats?.posture_score === 'number') {
+            score = Math.round(s.final_stats.posture_score);
+            if (score >= 90) {
+              postureText = 'Good';
+              statusText = 'Excellent';
+            } else if (score >= 60) {
+              postureText = 'Warning';
+              statusText = 'Needs Improvement';
+            } else {
+              postureText = 'Poor';
+              statusText = 'Poor';
+            }
+          } else if (statusRaw === 'WARNING') {
             score = 75;
             postureText = 'Warning';
             statusText = 'Needs Improvement';
@@ -293,7 +305,7 @@ export default function Dashboard() {
               <div className="chart-body">
                 <div className="chart-placeholder">
                   <div className="chart-bars">
-                    {(analytics?.weekly_trend || [88, 92, 85, 90, 95, 89, 94]).map((value, index) => (
+                    {(analytics?.weekly_trend || [0, 0, 0, 0, 0, 0, 0]).map((value, index) => (
                       <div key={index} className="chart-bar-wrapper">
                         <div 
                           className="chart-bar"
@@ -305,7 +317,9 @@ export default function Dashboard() {
                         >
                           <span className="bar-label">{value}%</span>
                         </div>
-                        <span className="bar-day">Day {index + 1}</span>
+                        <span className="bar-day">
+                          {analytics?.trend_labels?.[index] || `Day ${index + 1}`}
+                        </span>
                       </div>
                     ))}
                   </div>
